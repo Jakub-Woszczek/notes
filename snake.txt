@@ -1,0 +1,128 @@
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+entity pomidor is
+Port (
+clk : in STD_LOGIC;
+btn_interval : in STD_LOGIC;
+btn_direction : in STD_LOGIC;
+segments : out STD_LOGIC_VECTOR(7 downto 0); -- 8 segmentów po których porusza się waz
+clear : out STD_LOGIC_VECTOR(7 downto 0) -- bity na wyswietlaczu sa aktywne zerem, wiec to jest wektor,
+ktory ustawia wszystkie segmenty na 1
+);
+end pomidor;
+architecture Behavioral of pomidor is
+constant interval_long : integer := 25000000;
+constant interval_short : integer := 9500000;
+constant debounce_time : integer := 5000000;
+constant long_press_time : integer := 12500000;
+constant btn_interval_non_active_state : STD_LOGIC := '1';
+constant btn_direction_non_active_state : STD_LOGIC := '1';
+signal interval : integer := interval_long;
+signal direction : boolean := true;
+signal represented_by_0 : boolean := true; -- zmiena kolorow
+signal snake_lenght : integer := 2;
+signal rotate_reg : STD_LOGIC_VECTOR(7 downto 0) := "10011111"; -- stan poczatkowy weza
+signal btn_interval_counter : integer := 0;
+signal btn_direction_counter : integer := 0;
+signal btn_interval_short_press : boolean := false;
+signal btn_direction_short_press : boolean := false;
+signal btn_interval_long_press : boolean := false;
+signal btn_direction_long_press : boolean := false;
+begin
+btn_interval_debounce : process(clk)
+begin
+if rising_edge(clk) then
+btn_interval_short_press <= false;
+btn_interval_long_press <= false;
+if btn_interval = btn_interval_non_active_state then
+if btn_interval_counter >= debounce_time and btn_interval_counter < long_press_time then
+btn_interval_short_press <= true;
+end if;
+if btn_interval_counter >= long_press_time then
+btn_interval_long_press <= true;
+end if;
+btn_interval_counter <= 0;
+else
+btn_interval_counter <= btn_interval_counter + 1;
+end if;
+end if;
+end process;
+btn_direction_debounce : process(clk)
+begin
+if rising_edge(clk) then
+5
+btn_direction_short_press <= false;
+btn_direction_long_press <= false;
+if (btn_direction = btn_direction_non_active_state) then
+if btn_direction_counter >= debounce_time and btn_direction_counter < long_press_time then
+btn_direction_short_press <= true;
+end if;
+if btn_direction_counter >= long_press_time then
+btn_direction_long_press <= true;
+end if;
+btn_direction_counter <= 0;
+else
+btn_direction_counter <= btn_direction_counter + 1;
+end if;
+end if;
+end process;
+btn_interval_btn : process(btn_interval_short_press)
+begin
+if btn_interval_short_press'event and btn_interval_short_press = true then
+if interval = interval_long then
+interval <= interval_short;
+else
+interval <= interval_long;
+end if;
+end if;
+end process;
+btn_direction_btn : process(btn_direction_short_press)
+begin
+if btn_direction_short_press'event and btn_direction_short_press = true then
+direction <= not direction;
+end if;
+end process;
+move_and_transform : process(clk, btn_interval_long_press, btn_direction_long_press, rotate_reg,
+represented_by_0, snake_lenght)
+variable counter : integer := 0;
+begin
+if rising_edge(clk) then
+if counter >= interval then
+counter := 0;
+if direction then
+rotate_reg <= rotate_reg(0) & rotate_reg(7 downto 1);
+else
+rotate_reg <= rotate_reg(6 downto 0) & rotate_reg(7);
+end if;
+else
+counter := counter + 1;
+end if;
+end if;
+if btn_interval_long_press = true then
+rotate_reg <= not rotate_reg;
+represented_by_0 <= not represented_by_0;
+elsif btn_direction_long_press = true then
+if represented_by_0 then
+if snake_lenght = 2 then
+rotate_reg <= "10001111";
+snake_lenght <= 3;
+else
+rotate_reg <= "11100111";
+snake_lenght <= 2;
+end if;
+else
+if snake_lenght = 2 then
+rotate_reg <= "01110000";
+6
+snake_lenght <= 3;
+else
+rotate_reg <= "01100000";
+snake_lenght <= 2;
+end if;
+end if;
+end if;
+end process;
+segments <= rotate_reg;
+clear <= "11111111";
+end Behavioral;
