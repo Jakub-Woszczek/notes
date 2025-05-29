@@ -1,0 +1,54 @@
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.NUMERIC_STD.ALL;
+
+entity segment_timer is
+    Port (
+        clk     : in  STD_LOGIC;
+        rst     : in  STD_LOGIC;
+        seg     : out STD_LOGIC_VECTOR (6 downto 0) -- A to G
+    );
+end segment_timer;
+
+architecture Behavioral of segment_timer is
+    signal counter     : unsigned(25 downto 0) := (others => '0'); -- Licznik do ~1s przy 50MHz
+    signal seg_index   : integer range 0 to 6 := 0;
+    signal seg_array   : STD_LOGIC_VECTOR(6 downto 0) := "0000001"; -- zaczynamy od segmentu A
+begin
+
+    process(clk, rst)
+    begin
+        if rst = '1' then
+            counter   <= (others => '0');
+            seg_index <= 0;
+            seg_array <= "0000001"; -- segment A
+        elsif rising_edge(clk) then
+            if counter = 49999999 then -- 50 milionów cykli = 1s przy 50 MHz
+                counter <= (others => '0');
+                -- przesunięcie w prawo i zapętlenie
+                if seg_index = 6 then
+                    seg_index <= 0;
+                else
+                    seg_index <= seg_index + 1;
+                end if;
+
+                -- ustawienie nowego segmentu (jedynka w odpowiednim miejscu)
+                case seg_index is
+                    when 0 => seg_array <= "0000001"; -- A
+                    when 1 => seg_array <= "0000010"; -- B
+                    when 2 => seg_array <= "0000100"; -- C
+                    when 3 => seg_array <= "0001000"; -- D
+                    when 4 => seg_array <= "0010000"; -- E
+                    when 5 => seg_array <= "0100000"; -- F
+                    when 6 => seg_array <= "1000000"; -- G
+                    when others => seg_array <= "0000001";
+                end case;
+            else
+                counter <= counter + 1;
+            end if;
+        end if;
+    end process;
+
+    seg <= seg_array;
+
+end Behavioral;
