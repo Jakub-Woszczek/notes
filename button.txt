@@ -1,0 +1,74 @@
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+entity toggle_segment_display is
+    port (
+        clk_25MHz : in  std_logic;
+        pb1       : in  std_logic; -- Przycisk FLEX_PB1 (aktywny niski)
+        segment_a : out std_logic
+    );
+end entity toggle_segment_display;
+
+architecture Behavioral of toggle_segment_display is
+    -- Stałe
+    constant CLK_FREQUENCY : integer := 25_000_000; -- 25 MHz
+    constant DEBOUNCE_TIME : real    := 0.01;       -- 10 ms
+
+    -- Sygnały wewnętrzne dla debouncingu przycisku
+    signal debounce_counter : unsigned(31 downto 0) := (others => '0');
+    signal debounce_threshold : unsigned(31 downto 0);
+    signal debounced_pb1 : std_logic := '1'; -- Inicjalnie nie wciśnięty (pull-up)
+    signal pb1_d1 : std_logic := '1';
+    signal pb1_d2 : std_logic := '1';
+
+    -- Sygnał wewnętrzny do przechowywania stanu segmentu
+    signal segment_state : std_logic := '0';
+
+    -- Sygnał wewnętrzny do wykrywania pojedynczego naciśnięcia
+    signal button_pressed : std_logic := '0';
+
+begin
+    -- Obliczanie wartości licznika dla czasu debouncingu
+    debounce_threshold <= to_unsigned(integer(CLK_FREQUENCY * DEBOUNCE_TIME), 32);
+
+    -- Proces debouncingu przycisku PB1
+    debounce_process : process(clk_25MHz)
+    begin
+        if rising_edge(clk_25MHz) then
+            pb1_d2 <= pb1_d1;
+            pb1_d1 <= pb1;
+
+            if pb1_d1 = '0' and pb1_d2 = '1' then -- Wykryto zbocze opadające (naciśnięcie)
+                debounce_counter <= (others => '0');
+                debounced_pb1 <= '0';
+                button_pressed <= '0'; -- Reset flagi naciśnięcia
+            elsif pb1_d1 = '0' then
+                if debounce_counter < debounce_threshold then
+                    debounce_counter <= debounce_counter + 1;
+                else
+                    debounced_pb1 <= '0';
+                    button_pressed <= '1'; -- Ustaw flagę po debouncingu
+                end if;
+            else
+                debounced_pb1 <= '1';
+                debounce_counter <= (others => '0');
+                button_pressed <= '0';
+            end if;
+        end if;
+    end process debounce_process;
+
+    -- Proces przełączania stanu segmentu po naciśnięciu przycisku
+    toggle_process : process(clk_25MHz)
+    begin
+        if rising_edge(clk_25MHz) then
+            if button_pressed = '1' then
+                segment_state <= not segment_state;
+            end if;
+        end if;
+    end process toggle_process;
+
+    -- Przypisanie stanu segmentu do wyjścia
+    segment_a <= segment_state;
+
+end architecture Behavioral;
