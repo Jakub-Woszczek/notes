@@ -1,0 +1,57 @@
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+entity toggle_single_segment is
+    port (
+        clk_25MHz : in  std_logic;
+        btn       : in  std_logic; -- Przycisk (aktywny niski)
+        segment_a : out std_logic
+    );
+end entity toggle_single_segment;
+
+architecture Behavioral of toggle_single_segment is
+    -- Stałe
+    constant CLK_FREQUENCY : integer := 25_000_000; -- 25 MHz
+    constant DEBOUNCE_TIME_CYCLES : integer := 500000; -- Odpowiednik ok. 20ms dla 25MHz
+
+    -- Sygnały wewnętrzne dla debouncingu przycisku
+    signal btn_counter : integer := 0;
+    signal btn_short_press : boolean := false;
+    signal btn_state_d1 : std_logic := '1'; -- Poprzedni stan przycisku
+    signal btn_state_d2 : std_logic := '1'; -- Stan przycisku dwa takty temu
+
+    -- Sygnał wewnętrzny do przechowywania stanu segmentu
+    signal segment_on : std_logic := '0';
+
+begin
+    debounce_process : process(clk_25MHz)
+    begin
+        if rising_edge(clk_25MHz) then
+            btn_short_press <= false;
+            btn_state_d2 <= btn_state_d1;
+            btn_state_d1 <= btn;
+
+            if btn = '0' then -- Przycisk wciśnięty (aktywny niski)
+                btn_counter <= btn_counter + 1;
+            else -- Przycisk nie wciśnięty
+                if btn_state_d1 = '1' and btn_state_d2 = '0' and btn_counter > 0 and btn_counter < DEBOUNCE_TIME_CYCLES then
+                    btn_short_press <= true;
+                end if;
+                btn_counter <= 0;
+            end if;
+        end if;
+    end process debounce_process;
+
+    toggle_process : process(clk_25MHz)
+    begin
+        if rising_edge(clk_25MHz) then
+            if btn_short_press = true then
+                segment_on <= not segment_on;
+            end if;
+        end if;
+    end process toggle_process;
+
+    segment_a <= segment_on;
+
+end architecture Behavioral;
